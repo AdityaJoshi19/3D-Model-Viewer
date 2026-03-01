@@ -1,0 +1,5 @@
+{
+  "name": "3D Model Viewer",
+  "description": "A professional-grade 3D model viewer supporting NIfTI, STL, GLB, and more, with format conversion capabilities.",
+  "requestFramePermissions": []
+}
