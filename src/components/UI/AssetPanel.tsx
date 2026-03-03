@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Info, Eye, EyeOff, Trash2 } from "lucide-react";
+import { ScanSearch, Eye, EyeOff, Trash2 } from "lucide-react";
 import * as THREE from "three";
 import { ModelData } from "../../types";
 import { cn } from "../../utils/cn";
@@ -8,6 +8,10 @@ import { cn } from "../../utils/cn";
 interface AssetPanelProps {
   models: ModelData[];
   isAssetTabOpen: boolean;
+  selectedModelIndex: number | null;
+  setSelectedModelIndex: (index: number | null) => void;
+  inspectionMode: boolean;
+  setInspectionMode: (on: boolean) => void;
   handleExport: (format: "stl" | "glb", index: number) => void;
   removeModel: (index: number) => void;
   toggleSide: (index: number) => void;
@@ -22,6 +26,10 @@ interface AssetPanelProps {
 export const AssetPanel: React.FC<AssetPanelProps> = ({
   models,
   isAssetTabOpen,
+  selectedModelIndex,
+  setSelectedModelIndex,
+  inspectionMode,
+  setInspectionMode,
   handleExport,
   removeModel,
   toggleSide,
@@ -93,19 +101,23 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({
             >
               Loaded Assets
             </h3>
-            <div
+            <button
+              type="button"
+              onClick={() => setInspectionMode(!inspectionMode)}
+              title={inspectionMode ? "Inspection mode ON – hover models for metadata" : "Inspection mode OFF – click to enable"}
               className={cn(
-                "w-5 h-5 rounded flex items-center justify-center",
-                isDark ? "bg-white/5" : "bg-slate-100",
+                "w-7 h-7 rounded-lg flex items-center justify-center transition-colors",
+                inspectionMode
+                  ? isDark
+                    ? "bg-emerald-500/25 text-emerald-400"
+                    : "bg-emerald-500/20 text-emerald-600"
+                  : isDark
+                    ? "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60"
+                    : "bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600",
               )}
             >
-              <Info
-                className={cn(
-                  "w-2.5 h-2.5",
-                  isDark ? "text-white/40" : "text-slate-400",
-                )}
-              />
-            </div>
+              <ScanSearch className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           {/* Table - overflow-visible when color popover open so it isn't clipped */}
@@ -172,14 +184,18 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({
                   <tr
                     key={`${m.name}-${idx}`}
                     className={cn(
-                      "group/row border-b",
-                      isDark
-                        ? "border-white/5 hover:bg-white/5"
-                        : "border-slate-100 hover:bg-slate-50",
+                      "group/row border-b transition-colors",
+                      selectedModelIndex === idx
+                        ? isDark
+                          ? "bg-emerald-500/20 border-emerald-500/30"
+                          : "bg-emerald-500/15 border-emerald-500/40"
+                        : isDark
+                          ? "border-white/5 hover:bg-white/5"
+                          : "border-slate-100 hover:bg-slate-50",
                     )}
                   >
                     <td className="py-0.5 px-1 font-mono text-[10px] opacity-70">
-                      {idx}
+                      {idx + 1}
                     </td>
                     <td className="py-0.5 px-0 text-center">
                       <button
@@ -204,15 +220,19 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({
                       </button>
                     </td>
                     <td className="py-0.5 px-1.5 min-w-[120px] max-w-[180px]">
-                      <span
+                      <button
+                        type="button"
+                        onClick={() => setSelectedModelIndex(idx)}
                         className={cn(
-                          "block font-medium text-[11px] truncate",
-                          isDark ? "text-white/90" : "text-slate-800",
+                          "block w-full text-left font-medium text-[11px] truncate cursor-pointer rounded px-0.5 -mx-0.5 py-0.5 -my-0.5 transition-colors",
+                          isDark
+                            ? "text-white/90 hover:bg-white/10"
+                            : "text-slate-800 hover:bg-slate-200/80",
                         )}
                         title={m.name}
                       >
                         {m.name}
-                      </span>
+                      </button>
                     </td>
                     <td className="py-0.5 px-0.5 text-center">
                       <span

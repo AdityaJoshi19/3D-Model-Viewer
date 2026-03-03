@@ -20,6 +20,116 @@ import { Controls } from "./components/UI/Controls";
 import { AssetPanel } from "./components/UI/AssetPanel";
 import { Loader } from "./components/UI/Loader";
 
+const CARD_OFFSET = 14;
+
+function getModelMetadata(model: ModelData) {
+  const box = new THREE.Box3().setFromObject(model.object);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const min = box.min.clone();
+  const max = box.max.clone();
+
+  let meshCount = 0;
+  let hasNormals = false;
+  let hasUVs = false;
+  let drawCalls = 0;
+  model.object.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      meshCount += 1;
+      drawCalls += 1;
+      const geom = child.geometry;
+      if (geom) {
+        if (geom.attributes.normal) hasNormals = true;
+        if (geom.attributes.uv || geom.attributes.uv2) hasUVs = true;
+      }
+    }
+  });
+
+  const backface = model.side === THREE.DoubleSide ? "Double" : "Single";
+  const formatUpper = model.format.toUpperCase();
+
+  return [
+    ["File name", model.name],
+    ["Format", formatUpper],
+    ["Vertices", model.stats.vertices.toLocaleString()],
+    ["Triangles", model.stats.triangles.toLocaleString()],
+    ["Meshes", String(meshCount)],
+    ["Draw calls", String(drawCalls)],
+    ["Color", model.color],
+    ["Visible", model.visible !== false ? "Yes" : "No"],
+    ["Backface", backface],
+    ["Has normals", hasNormals ? "Yes" : "No"],
+    ["Has UVs", hasUVs ? "Yes" : "No"],
+    ["Size (W × H × D)", `${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`],
+    ["Center", `(${center.x.toFixed(3)}, ${center.y.toFixed(3)}, ${center.z.toFixed(3)})`],
+    ["Box min", `(${min.x.toFixed(3)}, ${min.y.toFixed(3)}, ${min.z.toFixed(3)})`],
+    ["Box max", `(${max.x.toFixed(3)}, ${max.y.toFixed(3)}, ${max.z.toFixed(3)})`],
+  ] as [string, string][];
+}
+
+function InspectionMetadataCard({
+  model,
+  isDark,
+}: {
+  model: ModelData;
+  isDark: boolean;
+}) {
+  const rows = getModelMetadata(model);
+  const valueStyle: React.CSSProperties = {
+    color: isDark ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.9)",
+    textAlign: "right",
+    maxWidth: "220px",
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
+  };
+
+  return (
+    <div
+      className="inspection-metadata-card"
+      style={{
+        padding: "10px 12px",
+        minWidth: "200px",
+        maxWidth: "320px",
+        background: isDark ? "rgba(20,20,22,0.97)" : "rgba(255,255,255,0.97)",
+        border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
+        borderRadius: "8px",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+        fontFamily: "system-ui, sans-serif",
+        fontSize: "11px",
+        lineHeight: 1.45,
+        pointerEvents: "none",
+      }}
+    >
+      {rows.map(([key, value]) => (
+        <div
+          key={key}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "14px",
+            marginBottom: "6px",
+            alignItems: "flex-start",
+          }}
+        >
+          <span
+            style={{
+              color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
+              flexShrink: 0,
+            }}
+          >
+            {key}
+          </span>
+          <span style={valueStyle} title={String(value)}>
+            {value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   const [models, setModels] = useState<ModelData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,6 +140,13 @@ export default function App() {
   const [backfacePreview, setBackfacePreview] = useState<{
     index: number;
     side: THREE.Side;
+  } | null>(null);
+  const [selectedModelIndex, setSelectedModelIndex] = useState<number | null>(null);
+  const [inspectionMode, setInspectionMode] = useState(false);
+  const [hoveredInspection, setHoveredInspection] = useState<{
+    index: number;
+    clientX: number;
+    clientY: number;
   } | null>(null);
   const controlsRef = useRef<any>(null);
   const hasInitialFitRef = useRef(false);
@@ -151,11 +268,17 @@ export default function App() {
 
   const removeModel = (index: number) => {
     setModels((prev) => prev.filter((_, i) => i !== index));
+    setSelectedModelIndex((prev) => {
+      if (prev === null) return null;
+      if (prev === index) return null;
+      return prev > index ? prev - 1 : prev;
+    });
   };
 
   const resetModels = () => {
     setModels([]);
     setError(null);
+    setSelectedModelIndex(null);
   };
 
   const toggleSide = (index: number) => {
@@ -299,6 +422,15 @@ export default function App() {
     }
   }, [models, fitCameraToBox]);
 
+  useEffect(() => {
+    if (
+      selectedModelIndex !== null &&
+      (selectedModelIndex < 0 || selectedModelIndex >= models.length)
+    ) {
+      setSelectedModelIndex(null);
+    }
+  }, [models.length, selectedModelIndex]);
+
   // After upload, when loading is done: fit camera after delay so Canvas/controls are ready, with cinematic animation.
   useEffect(() => {
     if (models.length === 0) {
@@ -376,8 +508,36 @@ export default function App() {
                   theme={theme}
                   showGrid={showGrid}
                   backfacePreview={backfacePreview}
+                  selectedModelIndex={selectedModelIndex}
+                  setSelectedModelIndex={setSelectedModelIndex}
+                  inspectionMode={inspectionMode}
+                  setHoveredInspection={setHoveredInspection}
                 />
               </Canvas>
+
+              {inspectionMode &&
+                hoveredInspection !== null &&
+                models[hoveredInspection.index] && (
+                  <div
+                    style={{
+                      position: "fixed",
+                      left: Math.min(
+                        hoveredInspection.clientX + CARD_OFFSET,
+                        window.innerWidth - 180,
+                      ),
+                      top: Math.min(
+                        hoveredInspection.clientY + CARD_OFFSET,
+                        window.innerHeight - 280,
+                      ),
+                      zIndex: 50,
+                    }}
+                  >
+                    <InspectionMetadataCard
+                      model={models[hoveredInspection.index]}
+                      isDark={theme === "dark"}
+                    />
+                  </div>
+                )}
 
               <Controls
                 resetCamera={resetCamera}
@@ -390,6 +550,10 @@ export default function App() {
               <AssetPanel
                 models={models}
                 isAssetTabOpen={isAssetTabOpen}
+                selectedModelIndex={selectedModelIndex}
+                setSelectedModelIndex={setSelectedModelIndex}
+                inspectionMode={inspectionMode}
+                setInspectionMode={setInspectionMode}
                 handleExport={handleExport}
                 removeModel={removeModel}
                 toggleSide={toggleSide}
