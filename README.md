@@ -30,3 +30,9 @@ npm run preview
 - **Tailwind CSS** for layout and styling
 - **Motion** for UI and loader animations
 - **react-dropzone** for file uploads
+
+## Live Demo
+
+- The application is deployed on Vercel and is publicly accessible.
+
+- Link: https://3-d-model-viewer-vert.vercel.app/
