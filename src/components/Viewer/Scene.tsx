@@ -17,6 +17,7 @@ interface SceneProps {
   controlsRef: React.RefObject<any>;
   theme: "light" | "dark";
   showGrid: boolean;
+  backfacePreview?: { index: number; side: THREE.Side } | null;
 }
 
 export const Scene: React.FC<SceneProps> = ({
@@ -24,6 +25,7 @@ export const Scene: React.FC<SceneProps> = ({
   controlsRef,
   theme,
   showGrid,
+  backfacePreview = null,
 }) => {
   const { scene } = useThree();
 
@@ -35,12 +37,14 @@ export const Scene: React.FC<SceneProps> = ({
     scene.background = new THREE.Color(bgColor);
     scene.fog = new THREE.Fog(bgColor, 50, 500);
 
-    models.forEach((m) => {
+    models.forEach((m, index) => {
       m.object.visible = m.visible !== false;
+      const effectiveSide =
+        backfacePreview?.index === index ? backfacePreview.side : m.side;
       m.object.traverse((child) => {
         if (child instanceof THREE.Mesh) {
           if (child.material instanceof THREE.MeshStandardMaterial) {
-            child.material.side = m.side;
+            child.material.side = effectiveSide;
             child.material.color.set(m.color);
             child.material.needsUpdate = true;
             child.material.roughness = 0.8;
@@ -52,7 +56,7 @@ export const Scene: React.FC<SceneProps> = ({
         }
       });
     });
-  }, [models, scene, theme]);
+  }, [models, scene, theme, backfacePreview]);
 
   const isDark = theme === "dark";
 

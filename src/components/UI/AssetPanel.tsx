@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Info, Eye, EyeOff, Trash2 } from "lucide-react";
 import * as THREE from "three";
@@ -13,6 +13,7 @@ interface AssetPanelProps {
   toggleSide: (index: number) => void;
   toggleModelVisibility: (index: number) => void;
   updateModelColor: (index: number, color: string) => void;
+  setBackfacePreview: (preview: { index: number; side: THREE.Side } | null) => void;
   getRootProps: any;
   getInputProps: any;
   theme: "light" | "dark";
@@ -26,11 +27,16 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({
   toggleSide,
   toggleModelVisibility,
   updateModelColor,
+  setBackfacePreview,
   getRootProps,
   getInputProps,
   theme,
 }) => {
   const isDark = theme === "dark";
+  const [colorOpenIndex, setColorOpenIndex] = useState<number | null>(null);
+  const colorTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const colorPopoverRef = useRef<HTMLDivElement>(null);
+
   const colors = [
     "#ffffff",
     "#ff4444",
@@ -45,6 +51,18 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({
     "#000000",
   ];
 
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (colorOpenIndex === null) return;
+      const target = e.target as Node;
+      const inPopover = colorPopoverRef.current?.contains(target);
+      const inTrigger = colorTriggerRef.current?.contains(target);
+      if (!inPopover && !inTrigger) setColorOpenIndex(null);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [colorOpenIndex]);
+
   return (
     <AnimatePresence>
       {isAssetTabOpen && (
@@ -53,255 +71,321 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 40, opacity: 0 }}
           className={cn(
-            "absolute top-4 md:top-10 right-4 md:right-10 w-[calc(100%-2rem)] sm:w-80 max-h-[70vh] overflow-y-auto p-4 md:p-6 rounded-2xl md:rounded-[32px] backdrop-blur-xl border shadow-2xl space-y-4 md:space-y-6 scrollbar-hide z-20 transition-colors duration-500",
+            "absolute top-4 md:top-10 right-4 md:right-10 w-[calc(100%-2rem)] sm:w-[420px] max-h-[70vh] flex flex-col rounded-2xl backdrop-blur-xl border shadow-xl z-20 transition-colors duration-500 px-4",
+            colorOpenIndex !== null ? "overflow-visible" : "overflow-hidden",
             isDark
-              ? "bg-black/60 border-white/10"
-              : "bg-white/80 border-slate-200",
+              ? "bg-black/70 border-white/10"
+              : "bg-white/90 border-slate-200",
           )}
         >
-          <div className="flex items-center justify-between">
+          {/* Header */}
+          <div
+            className={cn(
+              "flex items-center justify-between py-1.5 border-b shrink-0",
+              isDark ? "border-white/10" : "border-slate-200",
+            )}
+          >
             <h3
               className={cn(
-                "text-xs font-bold uppercase tracking-[0.2em]",
-                isDark ? "text-white/30" : "text-slate-400",
+                "text-[10px] font-bold uppercase tracking-wider",
+                isDark ? "text-white/40" : "text-slate-500",
               )}
             >
               Loaded Assets
             </h3>
             <div
               className={cn(
-                "w-8 h-8 rounded-xl flex items-center justify-center",
+                "w-5 h-5 rounded flex items-center justify-center",
                 isDark ? "bg-white/5" : "bg-slate-100",
               )}
             >
               <Info
                 className={cn(
-                  "w-4 h-4",
+                  "w-2.5 h-2.5",
                   isDark ? "text-white/40" : "text-slate-400",
                 )}
               />
             </div>
           </div>
 
-          <div className="space-y-3 md:space-y-4">
-            {models.map((m, idx) => (
-              <div
-                key={`${m.name}-${idx}`}
-                className={cn(
-                  "p-3 md:p-4 rounded-xl md:rounded-2xl border space-y-3 group/item transition-colors",
-                  isDark
-                    ? "bg-white/5 border-white/10"
-                    : "bg-slate-50 border-slate-200",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={cn(
-                      "text-xs font-bold truncate max-w-[120px]",
-                      isDark ? "text-white/80" : "text-slate-700",
-                    )}
-                  >
-                    {m.name}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => toggleModelVisibility(idx)}
-                      className={cn(
-                        "p-1.5 rounded-lg transition-colors opacity-0 group-hover/item:opacity-100",
-                        isDark
-                          ? "text-white/50 hover:bg-white/10 hover:text-white"
-                          : "text-slate-400 hover:bg-slate-200 hover:text-slate-600",
-                      )}
-                      title={m.visible !== false ? "Hide model" : "Show model"}
-                    >
-                      {m.visible !== false ? (
-                        <Eye className="w-3.5 h-3.5" />
-                      ) : (
-                        <EyeOff className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleExport("stl", idx)}
-                      className={cn(
-                        "p-1.5 rounded-lg transition-colors text-[10px] font-mono",
-                        isDark
-                          ? "hover:bg-white/10 text-white/40 hover:text-white"
-                          : "hover:bg-slate-200 text-slate-400 hover:text-slate-600",
-                      )}
-                      title="Export STL"
-                    >
-                      STL
-                    </button>
-                    <button
-                      onClick={() => removeModel(idx)}
-                      className={cn(
-                        "p-1.5 rounded-lg transition-colors opacity-0 group-hover/item:opacity-100",
-                        "hover:bg-red-500 hover:text-white",
-                        isDark ? "text-white/50" : "text-slate-400",
-                      )}
-                      title="Remove"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Color Selector */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p
-                      className={cn(
-                        "text-[8px] uppercase tracking-widest font-bold",
-                        isDark ? "text-white/20" : "text-slate-400",
-                      )}
-                    >
-                      Mesh Color
-                    </p>
-                    <div className="relative">
-                      <input
-                        type="color"
-                        value={m.color}
-                        onChange={(e) => updateModelColor(idx, e.target.value)}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                      />
-                      <div
-                        className="w-4 h-4 rounded-md border border-white/20 shadow-sm"
-                        style={{ backgroundColor: m.color }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {colors.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => updateModelColor(idx, color)}
-                        className={cn(
-                          "w-4 h-4 rounded-full border transition-transform hover:scale-125",
-                          m.color.toLowerCase() === color.toLowerCase()
-                            ? "border-emerald-500 scale-110"
-                            : "border-transparent",
-                        )}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-0.5">
-                    <p
-                      className={cn(
-                        "text-[8px] uppercase tracking-widest font-bold",
-                        isDark ? "text-white/20" : "text-slate-400",
-                      )}
-                    >
-                      Format
-                    </p>
-                    <p className="text-[10px] font-mono text-emerald-500 uppercase">
-                      {m.format}
-                    </p>
-                  </div>
-                  <div className="space-y-0.5">
-                    <p
-                      className={cn(
-                        "text-[8px] uppercase tracking-widest font-bold",
-                        isDark ? "text-white/20" : "text-slate-400",
-                      )}
-                    >
-                      Tris
-                    </p>
-                    <p
-                      className={cn(
-                        "text-[10px] font-mono",
-                        isDark ? "text-white/60" : "text-slate-600",
-                      )}
-                    >
-                      {m.stats.triangles.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-
-                <div
+          {/* Table - overflow-visible when color popover open so it isn't clipped */}
+          <div
+            className={cn(
+              "flex-1 min-h-0 -mx-4 px-4",
+              colorOpenIndex !== null ? "overflow-visible" : "overflow-x-auto overflow-y-auto",
+            )}
+          >
+            <table className="w-full border-collapse text-[11px]">
+              <thead className="sticky top-0 z-10">
+                <tr
                   className={cn(
-                    "pt-2 flex items-center justify-between border-t",
-                    isDark ? "border-white/5" : "border-slate-200",
+                    isDark ? "bg-black/50 text-white/40" : "bg-slate-100/90 text-slate-500",
                   )}
                 >
-                  <p
-                    className={cn(
-                      "text-[8px] uppercase tracking-widest font-bold",
-                      isDark ? "text-white/20" : "text-slate-400",
-                    )}
-                  >
-                    Backface
-                  </p>
-                  <div
-                    className={cn(
-                      "flex p-0.5 rounded-lg",
-                      isDark ? "bg-white/5" : "bg-slate-200",
-                    )}
-                  >
+                  <th className="w-6 py-1 pl-0 pr-1 text-left font-semibold">#</th>
+                  <th className="w-8 py-1 px-0 text-center font-semibold">
                     <button
-                      onClick={() =>
-                        m.side !== THREE.FrontSide && toggleSide(idx)
+                      type="button"
+                      onClick={() => {
+                        const allVisible = models.every((m) => m.visible !== false);
+                        if (allVisible) {
+                          models.forEach((_, i) => toggleModelVisibility(i));
+                        } else {
+                          models.forEach((m, i) => {
+                            if (m.visible === false) toggleModelVisibility(i);
+                          });
+                        }
+                      }}
+                      title={
+                        models.length > 0 && models.every((m) => m.visible === false)
+                          ? "Show all"
+                          : "Hide all"
                       }
                       className={cn(
-                        "px-2 py-1 rounded-md text-[8px] font-bold transition-all",
-                        m.side === THREE.FrontSide
+                        "p-0.5 rounded transition-colors inline-flex",
+                        models.length > 0 && models.every((m) => m.visible === false)
                           ? isDark
-                            ? "bg-white/10 text-white"
-                            : "bg-white text-slate-900 shadow-sm"
+                            ? "text-white/40 hover:bg-white/10 hover:text-white/60"
+                            : "text-slate-400 hover:bg-slate-200 hover:text-slate-600"
                           : isDark
-                            ? "text-white/30 hover:text-white"
-                            : "text-slate-500 hover:text-slate-700",
+                            ? "text-emerald-400 hover:bg-white/10 hover:text-emerald-300"
+                            : "text-emerald-600 hover:bg-white/80 hover:text-emerald-700",
                       )}
                     >
-                      SINGLE
-                    </button>
-                    <button
-                      onClick={() =>
-                        m.side !== THREE.DoubleSide && toggleSide(idx)
-                      }
-                      className={cn(
-                        "px-2 py-1 rounded-md text-[8px] font-bold transition-all",
-                        m.side === THREE.DoubleSide
-                          ? isDark
-                            ? "bg-white/10 text-white"
-                            : "bg-white text-slate-900 shadow-sm"
-                          : isDark
-                            ? "text-white/30 hover:text-white"
-                            : "text-slate-500 hover:text-slate-700",
+                      {models.length > 0 && models.every((m) => m.visible === false) ? (
+                        <EyeOff className="w-3.5 h-3.5" />
+                      ) : (
+                        <Eye className="w-3.5 h-3.5" />
                       )}
-                    >
-                      DOUBLE
                     </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                  </th>
+                  <th className="py-1 px-1.5 text-left font-semibold min-w-[120px]">Name</th>
+                  <th className="w-10 py-1 px-0.5 text-center font-semibold">Fmt</th>
+                  <th className="w-8 py-1 px-0 text-center font-semibold" title="Color">Clr</th>
+                  <th className="w-12 py-1 px-0.5 text-right font-semibold">Tris</th>
+                  <th className="w-16 py-1 px-0.5 text-center font-semibold">Back</th>
+                  <th className="w-14 py-1 pr-0 pl-0.5 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {models.map((m, idx) => (
+                  <tr
+                    key={`${m.name}-${idx}`}
+                    className={cn(
+                      "group/row border-b",
+                      isDark
+                        ? "border-white/5 hover:bg-white/5"
+                        : "border-slate-100 hover:bg-slate-50",
+                    )}
+                  >
+                    <td className="py-0.5 px-1 font-mono text-[10px] opacity-70">
+                      {idx}
+                    </td>
+                    <td className="py-0.5 px-0 text-center">
+                      <button
+                        onClick={() => toggleModelVisibility(idx)}
+                        className={cn(
+                          "p-0.5 rounded transition-colors",
+                          m.visible !== false
+                            ? isDark
+                              ? "text-emerald-400 hover:text-emerald-300"
+                              : "text-emerald-600 hover:text-emerald-700"
+                            : isDark
+                              ? "text-white/30 hover:text-white/50"
+                              : "text-slate-400 hover:text-slate-600",
+                        )}
+                        title={m.visible !== false ? "Hide" : "Show"}
+                      >
+                        {m.visible !== false ? (
+                          <Eye className="w-3.5 h-3.5" />
+                        ) : (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </td>
+                    <td className="py-0.5 px-1.5 min-w-[120px] max-w-[180px]">
+                      <span
+                        className={cn(
+                          "block font-medium text-[11px] truncate",
+                          isDark ? "text-white/90" : "text-slate-800",
+                        )}
+                        title={m.name}
+                      >
+                        {m.name}
+                      </span>
+                    </td>
+                    <td className="py-0.5 px-0.5 text-center">
+                      <span
+                        className={cn(
+                          "text-[9px] font-mono uppercase",
+                          isDark ? "text-emerald-400/90" : "text-emerald-600",
+                        )}
+                      >
+                        {m.format}
+                      </span>
+                    </td>
+                    <td className="py-0.5 px-0 text-center align-middle relative">
+                      <div className="relative inline-block">
+                        <button
+                          ref={(el) => {
+                            if (idx === colorOpenIndex) colorTriggerRef.current = el;
+                          }}
+                          onClick={() =>
+                            setColorOpenIndex((prev) => (prev === idx ? null : idx))
+                          }
+                          className="w-4 h-4 rounded border border-white/20 shadow-sm inline-block align-middle"
+                          style={{ backgroundColor: m.color }}
+                          title="Mesh color"
+                        />
+                        {/* Color panel inline above the swatch so it's always visible */}
+                        {colorOpenIndex === idx && (
+                          <div
+                            ref={colorPopoverRef}
+                            className={cn(
+                              "absolute left-full top-0 ml-1 p-1.5 rounded-lg border shadow-xl flex flex-col gap-1 z-[100] min-w-[140px]",
+                              isDark
+                                ? "bg-slate-900 border-white/10"
+                                : "bg-white border-slate-200",
+                            )}
+                          >
+                            <div className="flex gap-0.5 flex-wrap max-w-[140px]">
+                              {colors.map((color) => (
+                                <button
+                                  key={color}
+                                  onClick={() => {
+                                    updateModelColor(idx, color);
+                                  }}
+                                  className={cn(
+                                    "w-4 h-4 rounded-full border shrink-0",
+                                    m.color.toLowerCase() === color.toLowerCase()
+                                      ? "border-emerald-500 ring-1 ring-emerald-500"
+                                      : "border-transparent",
+                                  )}
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="color"
+                                value={m.color}
+                                onChange={(e) =>
+                                  updateModelColor(idx, e.target.value)
+                                }
+                                className="w-6 h-4 rounded border-0 cursor-pointer p-0 bg-transparent"
+                              />
+                              <span className="text-[9px] opacity-70">Custom</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-0.5 px-0.5 text-right font-mono text-[10px] opacity-80">
+                      {m.stats.triangles.toLocaleString()}
+                    </td>
+                    <td className="py-0.5 px-0.5 text-center">
+                      <div
+                        className={cn(
+                          "inline-flex p-0.5 rounded text-[8px] font-medium",
+                          isDark ? "bg-white/5" : "bg-slate-200/80",
+                        )}
+                      >
+                        <button
+                          onClick={() =>
+                            m.side !== THREE.FrontSide && toggleSide(idx)
+                          }
+                          onMouseEnter={() =>
+                            setBackfacePreview({ index: idx, side: THREE.FrontSide })
+                          }
+                          onMouseLeave={() => setBackfacePreview(null)}
+                          title="Single side"
+                          className={cn(
+                            "px-1 rounded transition-colors",
+                            m.side === THREE.FrontSide
+                              ? isDark
+                                ? "bg-white/15 text-white"
+                                : "bg-white text-slate-800 shadow-sm"
+                              : isDark
+                                ? "text-white/40 hover:text-white"
+                                : "text-slate-500 hover:text-slate-700",
+                          )}
+                        >
+                          S
+                        </button>
+                        <button
+                          onClick={() =>
+                            m.side !== THREE.DoubleSide && toggleSide(idx)
+                          }
+                          onMouseEnter={() =>
+                            setBackfacePreview({ index: idx, side: THREE.DoubleSide })
+                          }
+                          onMouseLeave={() => setBackfacePreview(null)}
+                          title="Double side"
+                          className={cn(
+                            "px-1 rounded transition-colors",
+                            m.side === THREE.DoubleSide
+                              ? isDark
+                                ? "bg-white/15 text-white"
+                                : "bg-white text-slate-800 shadow-sm"
+                              : isDark
+                                ? "text-white/40 hover:text-white"
+                                : "text-slate-500 hover:text-slate-700",
+                          )}
+                        >
+                          D
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-0.5 px-0 text-right">
+                      <div className="flex items-center justify-end gap-0.5">
+                        <button
+                          onClick={() => handleExport("stl", idx)}
+                          className={cn(
+                            "px-1 py-0.5 rounded text-[9px] font-mono transition-colors",
+                            isDark
+                              ? "hover:bg-white/10 text-white/50 hover:text-white"
+                              : "hover:bg-slate-200 text-slate-500 hover:text-slate-700",
+                          )}
+                          title="Export STL"
+                        >
+                          STL
+                        </button>
+                        <button
+                          onClick={() => removeModel(idx)}
+                          className={cn(
+                            "p-0.5 rounded transition-colors hover:bg-red-500 hover:text-white",
+                            isDark ? "text-white/40" : "text-slate-400",
+                          )}
+                          title="Remove"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          <div className="pt-2">
+          {/* Add more */}
+          <div
+            className={cn(
+              "shrink-0 py-1.5 border-t -mx-4 px-4",
+              isDark ? "border-white/10" : "border-slate-200",
+            )}
+          >
             <div
               {...getRootProps()}
               className={cn(
-                "p-4 rounded-xl md:rounded-2xl border border-dashed transition-all cursor-pointer text-center group",
+                "py-1.5 px-2 rounded border border-dashed text-center cursor-pointer transition-all text-[10px] font-medium uppercase tracking-wider",
                 isDark
-                  ? "border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/5"
-                  : "border-slate-300 hover:border-emerald-500 hover:bg-emerald-50",
+                  ? "border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/10 text-white/30 hover:text-emerald-400"
+                  : "border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 text-slate-500 hover:text-emerald-600",
               )}
             >
               <input {...getInputProps()} />
-              <p
-                className={cn(
-                  "text-[10px] font-bold uppercase tracking-widest transition-colors",
-                  isDark
-                    ? "text-white/20 group-hover:text-emerald-400"
-                    : "text-slate-400 group-hover:text-emerald-600",
-                )}
-              >
-                + Add More Assets
-              </p>
+              + Add more
             </div>
           </div>
         </motion.div>

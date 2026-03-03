@@ -27,6 +27,10 @@ export default function App() {
   const [isAssetTabOpen, setIsAssetTabOpen] = useState(true);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [showGrid, setShowGrid] = useState(true);
+  const [backfacePreview, setBackfacePreview] = useState<{
+    index: number;
+    side: THREE.Side;
+  } | null>(null);
   const controlsRef = useRef<any>(null);
   const hasInitialFitRef = useRef(false);
   const fitAnimationRafRef = useRef<number | null>(null);
@@ -371,6 +375,7 @@ export default function App() {
                   controlsRef={controlsRef}
                   theme={theme}
                   showGrid={showGrid}
+                  backfacePreview={backfacePreview}
                 />
               </Canvas>
 
@@ -390,6 +395,7 @@ export default function App() {
                 toggleSide={toggleSide}
                 toggleModelVisibility={toggleModelVisibility}
                 updateModelColor={updateModelColor}
+                setBackfacePreview={setBackfacePreview}
                 getRootProps={getRootProps}
                 getInputProps={getInputProps}
                 theme={theme}
